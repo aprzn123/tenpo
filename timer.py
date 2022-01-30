@@ -6,7 +6,7 @@ import sys
 import json
 from playsound import playsound
 
-PORT = 2799
+PORT = 12799
 IP = "127.0.0.1"
 ADDR = (IP, PORT)
 HEAD_LEN = 32
@@ -19,21 +19,23 @@ class Server:
         self.server.bind(ADDR)
     
     def handle_client(self, conn, addr): 
-        logging.info(f"New connection from {addr}")
-        connected = True
-        while connected:
-            head = conn.recv(HEAD_LEN).decode(FORMAT)
-            if not head:
-                break;
-            msg_len = int(head)
-            msg = json.loads(conn.recv(msg_len).decode(FORMAT))
-            logging.info(f"message recieved: {msg}")
-            if msg == DISCONNECT_MESSAGE:
-                connected = False
-            threading.Thread(target=lambda: playsound("notif.mp3")).start()
-
-        logging.info(f"Disconnecting from {addr}")
-        conn.close()
+        try:
+            logging.info(f"New connection from {addr}")
+            connected = True
+            while connected:
+                head = conn.recv(HEAD_LEN).decode(FORMAT)
+                print(head)
+                if not head:
+                    break;
+                msg_len = int(head)
+                msg = json.loads(conn.recv(msg_len).decode(FORMAT))
+                logging.info(f"message recieved: {msg}")
+                if msg == DISCONNECT_MESSAGE:
+                    connected = False
+                threading.Thread(target=lambda: playsound("notif.mp3")).start()
+        finally:
+            logging.info(f"Disconnecting from {addr}")
+            conn.close()
 
     def start(self):
         self.server.listen()
@@ -73,4 +75,4 @@ if __name__ == "__main__":
         server.start()
     else:
         with Client() as client:
-            pass
+            client.send({"hello": "world"})
