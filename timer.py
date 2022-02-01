@@ -1,10 +1,12 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
+from typing import Optional
 import socket
 import threading
 import logging
 import sys
 import json
-from playsound import playsound
+
+from playsound import playsound # type: ignore
 
 PORT = 12799
 IP = "127.0.0.1"
@@ -12,67 +14,86 @@ ADDR = (IP, PORT)
 HEAD_LEN = 32
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = {"dcon": True}
+STOP_MESSAGE = {"stop": True}
 
 class Server:
-    def __init__(self):
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def __init__(self: 'Server') -> None:
+        self.server: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server.bind(ADDR)
+        self.open: bool = True
     
-    def handle_client(self, conn, addr): 
-        try:
-            logging.info(f"New connection from {addr}")
-            connected = True
-            while connected:
-                head = conn.recv(HEAD_LEN).decode(FORMAT)
-                print(head)
-                if not head:
-                    break;
-                msg_len = int(head)
-                msg = json.loads(conn.recv(msg_len).decode(FORMAT))
-                logging.info(f"message recieved: {msg}")
-                if msg == DISCONNECT_MESSAGE:
-                    connected = False
+    def handle_client(self: 'Server', conn: socket.socket, addr: tuple[str, int]) -> None: 
+        logging.info(f"New connection from {addr}")
+        connected: bool = True
+        while connected:
+            head: str = conn.recv(HEAD_LEN).decode(FORMAT)
+            if not head:
+                break;
+            msg_len: int = int(head)
+            msg: dict = json.loads(conn.recv(msg_len).decode(FORMAT))
+            logging.info(f"message recieved: {msg}")
+            if msg == DISCONNECT_MESSAGE:
+                connected = False
+                logging.info(f"Disconnecting from {addr}")
+                conn.close()
+            elif msg == STOP_MESSAGE:
+                connected = False
+                self.stop()
+            else:
                 threading.Thread(target=lambda: playsound("notif.mp3")).start()
-        finally:
-            logging.info(f"Disconnecting from {addr}")
-            conn.close()
 
-    def start(self):
+    def start(self: 'Server') -> None:
         self.server.listen()
         logging.info(f"Listening on port {PORT}")
-        while True:
+        while self.open:
+            conn: socket.socket
+            addr: tuple[str, int]
             conn, addr = self.server.accept()
-            thread = threading.Thread(target=self.handle_client, args=(conn, addr))
+            thread: threading.Thread = threading.Thread(target=self.handle_client, args=(conn, addr))
             thread.start()
 
+    def stop(self):
+        logging.info("Shutting down server")
+        self.server.shutdown(socket.SHUT_RDWR)
+        self.server.close()
+        exit()
+
 class Client:
-    def __enter__(self):
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def __enter__(self: 'Client') -> 'Client':
+        self.client: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect(ADDR)
         return self
 
-    def __exit__(self, etype, evalue, etrace):
+    def __exit__(self: 'Client', etype: Optional[type], evalue: Optional[Exception], etrace: None):
         self.send(DISCONNECT_MESSAGE)
 
     def send(self, msg):
-        sendable = json.dumps(msg).encode(FORMAT)
-        msg_len = str(len(sendable)).encode(FORMAT)
+        sendable: bytes = json.dumps(msg).encode(FORMAT)
+        msg_len: bytes = str(len(sendable)).encode(FORMAT)
         msg_len += b' ' * (HEAD_LEN - len(msg_len))
         self.client.send(msg_len)
         self.client.send(sendable)
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
+    parser: ArgumentParser = ArgumentParser()
     parser.add_argument('--server', action='store_true')
-    args = parser.parse_args()
+    parser.add_argument('--stop', action='store_true')
+    args: Namespace = parser.parse_args()
 
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="[%(asctime)s] [%(levelname)s] - %(message)s")
     #logging.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] - %(message)s"))
     
     if args.server:
-        server = Server()
-        server.start()
+        server: Server = Server()
+        try:
+            server.start()
+        except KeyboardInterrupt:
+            server.stop()
     else:
         with Client() as client:
-            client.send({"hello": "world"})
+            if args.stop:
+                client.send(STOP_MESSAGE)
+            else:
+                client.send({"hello": "world"})
