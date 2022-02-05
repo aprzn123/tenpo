@@ -1,6 +1,6 @@
 from argparse import ArgumentParser, Namespace
 from subprocess import Popen
-from typing import Optional
+from typing import Optional, Any
 import socket
 import threading
 import logging
@@ -17,7 +17,7 @@ FORMAT = "utf-8"
 DISCONNECT_MESSAGE = {"dcon": True}
 STOP_MESSAGE = {"stop": True}
 
-def play_notif(file="notif.mp3"):
+def play_notif(file:str="notif.mp3") -> None:
     threading.Thread(target=lambda: Popen(f"ffplay {file} -nodisp -autoexit".split())).start()
 
 
@@ -39,7 +39,7 @@ class Server:
             if not head:
                 break;
             msg_len: int = int(head)
-            msg: dict = json.loads(conn.recv(msg_len).decode(FORMAT))
+            msg: dict[Any, Any] = json.loads(conn.recv(msg_len).decode(FORMAT))
             logging.info(f"message recieved: {msg}")
             if msg == DISCONNECT_MESSAGE:
                 connected = False
@@ -61,7 +61,7 @@ class Server:
             thread: threading.Thread = threading.Thread(target=self.handle_client, args=(conn, addr))
             thread.start()
 
-    def stop(self):
+    def stop(self: 'Server') -> None:
         logging.info("Shutting down server")
         self.server.shutdown(socket.SHUT_RDWR)
         self.server.close()
@@ -73,10 +73,10 @@ class Client:
         self.client.connect(ADDR)
         return self
 
-    def __exit__(self: 'Client', etype: Optional[type], evalue: Optional[Exception], etrace: None):
+    def __exit__(self: 'Client', etype: Optional[type], evalue: Optional[Exception], etrace: None) -> None:
         self.send(DISCONNECT_MESSAGE)
 
-    def send(self, msg):
+    def send(self: 'Client', msg: dict[Any, Any]) -> None:
         sendable: bytes = json.dumps(msg).encode(FORMAT)
         msg_len: bytes = str(len(sendable)).encode(FORMAT)
         msg_len += b' ' * (HEAD_LEN - len(msg_len))
