@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, Namespace
+from subprocess import Popen
 from typing import Optional
 import socket
 import threading
@@ -15,6 +16,13 @@ HEAD_LEN = 32
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = {"dcon": True}
 STOP_MESSAGE = {"stop": True}
+
+def play_notif(file="notif.mp3"):
+    threading.Thread(target=lambda: Popen(f"ffplay {file} -nodisp -autoexit".split())).start()
+
+
+class Backend:
+    pass
 
 class Server:
     def __init__(self: 'Server') -> None:
@@ -41,7 +49,7 @@ class Server:
                 connected = False
                 self.stop()
             else:
-                threading.Thread(target=lambda: playsound("notif.mp3")).start()
+                play_notif()
 
     def start(self: 'Server') -> None:
         self.server.listen()
