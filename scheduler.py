@@ -3,7 +3,7 @@ from typing import Callable, Optional
 from threading import Thread, Lock
 from time import sleep
 
-from plyer import notification as notif
+from plyer import notification as notif # type: ignore
 
 
 # ScheduledEvent(call, time):
@@ -81,11 +81,13 @@ class Scheduler:
 if __name__ == '__main__':
     def make_notify(msg: str) -> Callable[[], None]:
         def inner() -> None:
-            print("notifying")
             notif.notify(msg)
         return inner
     sched: Scheduler = Scheduler(1)
     sched.start()
     ev: ScheduledEvent = sched.schedule_in_future(make_notify("hello"), timedelta(seconds=10))
-    print(ev)
+    sleep(2)
+    ev2: ScheduledEvent = sched.schedule_in_future(make_notify("hello 2"), timedelta(seconds=5))
+    ev3: ScheduledEvent = sched.schedule_in_future(make_notify("hello 3"), timedelta(seconds=10))
+    ev4: ScheduledEvent = sched.schedule_in_future(make_notify("hello 4"), timedelta(seconds=8))
     sleep(20)

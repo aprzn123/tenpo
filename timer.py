@@ -3,7 +3,7 @@ from subprocess import Popen
 from typing import Optional, Any
 import socket
 import threading
-import logging
+from loggy import logger
 import sys
 import json
 
@@ -32,7 +32,7 @@ class Server:
         self.open: bool = True
     
     def handle_client(self: 'Server', conn: socket.socket, addr: tuple[str, int]) -> None: 
-        logging.info(f"New connection from {addr}")
+        logger.info(f"New connection from {addr}")
         connected: bool = True
         while connected:
             head: str = conn.recv(HEAD_LEN).decode(FORMAT)
@@ -40,10 +40,10 @@ class Server:
                 break;
             msg_len: int = int(head)
             msg: dict[Any, Any] = json.loads(conn.recv(msg_len).decode(FORMAT))
-            logging.info(f"message recieved: {msg}")
+            logger.info(f"message recieved: {msg}")
             if msg == DISCONNECT_MESSAGE:
                 connected = False
-                logging.info(f"Disconnecting from {addr}")
+                logger.info(f"Disconnecting from {addr}")
                 conn.close()
             elif msg == STOP_MESSAGE:
                 connected = False
@@ -53,7 +53,7 @@ class Server:
 
     def start(self: 'Server') -> None:
         self.server.listen()
-        logging.info(f"Listening on port {PORT}")
+        logger.info(f"Listening on port {PORT}")
         while self.open:
             conn: socket.socket
             addr: tuple[str, int]
@@ -62,7 +62,7 @@ class Server:
             thread.start()
 
     def stop(self: 'Server') -> None:
-        logging.info("Shutting down server")
+        logger.info("Shutting down server")
         self.server.shutdown(socket.SHUT_RDWR)
         self.server.close()
         exit()
@@ -90,9 +90,6 @@ if __name__ == "__main__":
     parser.add_argument('--stop', action='store_true')
     args: Namespace = parser.parse_args()
 
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="[%(asctime)s] [%(levelname)s] - %(message)s")
-    #logging.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] - %(message)s"))
-    
     if args.server:
         server: Server = Server()
         try:
