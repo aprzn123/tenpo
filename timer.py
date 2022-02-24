@@ -3,11 +3,15 @@ from subprocess import Popen
 from typing import Optional, Any
 import socket
 import threading
-from loggy import logger
 import sys
 import json
+import logging
 
 from playsound import playsound # type: ignore
+
+from loggy import setup_logger
+import scheduler
+
 
 PORT = 12799
 IP = "127.0.0.1"
@@ -16,6 +20,8 @@ HEAD_LEN = 32
 FORMAT = "utf-8"
 DISCONNECT_MESSAGE = {"dcon": True}
 STOP_MESSAGE = {"stop": True}
+
+logger: logging.Logger = logging.getLogger()
 
 def play_notif(file:str="notif.mp3") -> None:
     threading.Thread(target=lambda: Popen(f"ffplay {file} -nodisp -autoexit".split())).start()
@@ -86,9 +92,13 @@ class Client:
 
 if __name__ == "__main__":
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('--server', action='store_true')
-    parser.add_argument('--stop', action='store_true')
+    subcommand = parser.add_mutually_exclusive_group()
+    subcommand.add_argument('--server', action='store_true', help="Start the server")
+    subcommand.add_argument('--stop', action='store_true', help="Stop the server")
+    parser.add_argument('--verbose', '-v', action='store_true', help="Log more things")
     args: Namespace = parser.parse_args()
+
+    setup_logger(args.verbose)
 
     if args.server:
         server: Server = Server()

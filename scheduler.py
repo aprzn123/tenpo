@@ -2,9 +2,13 @@ from datetime import datetime, timedelta
 from typing import Callable, Optional
 from threading import Thread, Lock
 from time import sleep
+import logging
+from loggy import setup_logger
 
 from plyer import notification as notif # type: ignore
 
+
+logger: logging.Logger = logging.getLogger()
 
 # ScheduledEvent(call, time):
 # call: Callable[[], None] is the function to be called
@@ -17,6 +21,7 @@ class ScheduledEvent:
 
     # ScheduledEvent()(): calls the event's call method
     def __call__(self: 'ScheduledEvent') -> None:
+        logger.info(f"Calling scheduled event: {self}")
         self.done = True
         self.call()
 
@@ -53,32 +58,38 @@ class Scheduler:
 
     # Scheduler().run(): Every <interval> seconds, call all scheduled events that are ready to be called. Blocks.
     def run(self: 'Scheduler') -> None:
+        logger.info(f'Scheduler started with interval {self.interval} seconds')
         self.running = True
         while True:
             sleep(self.interval)
             if not self.running:
+                logger.info('Scheduler fully done')
                 break
             Thread(target=self._call_scheduled_events).start()
 
     # Scheduler().start(): Every <interval> seconds, call all scheduled events that are ready to be called. Does not block.
     def start(self: 'Scheduler') -> None:
+        logger.info('Starting scheduler daemon')
         Thread(target=self.run, daemon=True).start()
 
     # Scheduler().stop(): Stops the loop used in run or start(). Does not block.
     def stop(self: 'Scheduler') -> None:
         self.running = False
+        logger.info('Scheduler set to shut down in a few seconds')
         
     # Scheduler()._call_scheduled_events(): Calls all events that were scheduled at some point in the past. Does not block.
     def _call_scheduled_events(self: 'Scheduler') -> None:
+        logger.info('Checking for events')
         now = datetime.now()
         with self.lock_queue:
-            print(self.event_queue)
+            logger.debug(self.event_queue)
             while self.event_queue and self.event_queue[-1].time < now:
                 event: ScheduledEvent = self.event_queue.pop()
                 Thread(target=event, daemon=True).start()
         
 
 if __name__ == '__main__':
+    setup_logger(True)
     def make_notify(msg: str) -> Callable[[], None]:
         def inner() -> None:
             notif.notify(msg)
